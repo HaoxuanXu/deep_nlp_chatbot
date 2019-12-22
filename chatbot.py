@@ -62,7 +62,7 @@ def clean_text(text):    ## I will define a custom text cleaning function
     text = re.sub(r"hasn't", "has not", text)
     text = re.sub(r"shouldn't", "should not", text)
     text = re.sub(r"wouldn't", "would not", text)
-    text = re.sub(r"[-()\"#/@;:<>{}+=~|.?,]")
+    text = re.sub(r"[-()\"#/@;:<>{}+=~|.?,]", "", text)
     return text
 
 
@@ -74,13 +74,49 @@ answers_cleaned = [clean_text(answer) for answer in answers]
 
 
 
+## Creating a dictionary that maps each word to its number of occurrences
+word2count = {}
+
+for question in questions_cleaned:
+    for word in question.split():
+        if word in word2count:
+            word2count[word] += 1
+        else:
+            word2count[word] = 1
+            
+for answer in answers_cleaned:
+    for word in answer.split():
+        if word in word2count:
+            word2count[word] += 1
+        else:
+            word2count[word] = 1
 
 
+## Creating two dictionaries that map the question words and answer words to unique integers
+threshold_of_occurrence = 20
+questionwords2int = {}
+unique_integer = 0
+
+for word, count in word2count.items():
+    if count >= threshold_of_occurrence:
+        questionwords2int[word] = unique_integer
+        unique_integer += 1
 
 
+answerwords2int = {}
+unique_integer = 0
+for word, count in word2count.items():
+    if count >= threshold_of_occurrence:
+        answerwords2int[word] = unique_integer
+        unique_integer += 1
+        
+## Adding the last tokens (SOS, EOS) to the two dictionaries
+tokens = ["<PAD>", "<EOS>", "<OUT>", "<SOS>"]
+for token in tokens:
+    questionwords2int[token] = len(questionwords2int) + 1
+    answerwords2int[token] = len(answerwords2int) + 1
 
-
-
+## Creating the inverse dictionary of the answerwords2int dictionary
 
 
 
