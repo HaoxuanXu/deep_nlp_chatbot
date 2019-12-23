@@ -117,13 +117,50 @@ for token in tokens:
     answerwords2int[token] = len(answerwords2int) + 1
 
 ## Creating the inverse dictionary of the answerwords2int dictionary
+answerint2word = {_int: word for word, _int in answerwords2int.items()}
+
+
+## Adding the EOS token to the end of every answer
+for i in range(len(answers_cleaned)):
+    answers_cleaned[i] += " <EOS>"
+
+
+## Translating all the questions and the answers into integers
+## and replacing all the words that were filtered out by <OUT>
+questions_to_int = []
+for question in questions_cleaned:
+    integers = []
+    for word in question.split():
+        if word not in questionwords2int:
+            integers.append(questionwords2int["<OUT>"])
+        else:
+            integers.append(questionwords2int[word])
+    questions_to_int.append(integers)
+    
+
+answers_to_int = []
+for answer in answers_cleaned:
+    integers = []
+    for word in answer.split():
+        if word not in answerwords2int:
+            integers.append(answerwords2int["<OUT>"])
+        else:
+            integers.append(answerwords2int[word])
+    answers_to_int.append(integers)
+
+## Sorting questions and answers by the length of questions (helps speed up the training)
+questions_cleaned_sorted = []
+answers_cleaned_sorted = []
+for length in range(1, 25 + 1):
+    for i in enumerate(questions_to_int):
+        if len(i[1]) == length:
+            questions_cleaned_sorted.append(questions_to_int[i[0]])
+            answers_cleaned_sorted.append(answers_to_int[i[0]])
 
 
 
 
-
-
-
+############## Building the Seq2Seq Model #####################################
 
 
 
