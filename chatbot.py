@@ -162,6 +162,54 @@ for length in range(1, 25 + 1):
 
 ############## Building the Seq2Seq Model #####################################
 
+## Creating placeholders for the inputs and the targets
+def model_inputs():
+    # The input and target are two-dimensional matrices with unique integers
+    inputs = tf.placeholder(tf.int32, [None, None], name = "input")  
+    targets = tf.placeholder(tf.int32, [None, None], name = "target")
+    learning_rate = tf.placeholder(tf.float32, name = "learning_rate")  # store the learning rate 
+    keep_proba = tf.placeholder(tf.float32, name = "keep_proba")  # controls the drop-out rate
+    
+    return inputs, targets, learning_rate, keep_proba
+    
+
+## Preprocessing the targets
+########## targets must be in batches 
+def preprocess_targets(targets, batch_size, word2int):
+    SOS_matrix = tf.fill([batch_size, 1], word2int["<SOS>"])
+    batched_answers = tf.strided_slice(targets, [0,0], [batch_size, -1], [1,1])         # strided_slice function extracts a subset of the tensor 
+    preprocessed_targets = tf.concat([SOS_matrix, batched_answers], axis = 1)
+    
+    return preprocessed_targets
+    
+
+
+
+
+###### Creating the Encoder RNN Model 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
