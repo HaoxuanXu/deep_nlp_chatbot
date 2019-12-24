@@ -395,15 +395,33 @@ with tf.name_scope("optimization"):
 
 
 ## Padding the sequences with the <PAD> token
-## Question: ['who' 'are' 'you']
-## Answer: [<SOS> 'I' 'am' 'a' 'bot' '.' <EOS>]
+## Question: ['who' 'are' 'you', <PAD>, <PAD>, <PAD>, <PAD>]
+## Answer: [<SOS> 'I' 'am' 'a' 'bot' '.' <EOS>, <PAD>, <PAD>]
+def apply_padding(batch_of_sequences, word2int):
+    max_sequence_length = max([len(sequence) for sequence in batch_of_sequences])
+    padded_sequences = [sequence + [word2int["<PAD>"]] * (max_sequence_length - len(sequence)) for sequence in batch_of_sequences]
+    return padded_sequences
 
 
+## Splitting the data into batches of questions and answers
+def split_into_batches(questions, answers, batch_size):
+    for batch_index in range(0, len(questions)//batch_size):
+        start_index = batch_index * batch_size
+        questions_in_batch = questions[start_index : start_index + batch_size]
+        answers_in_batch = answers[start_index : start_index + batch_size]
+        
+        # apply padding
+        questions_in_batch_padded = np.array(apply_padding(questions_in_batch, questionwords2int))
+        answers_in_batch_padded = np.array(apply_padding(answers_in_batch, answerwords2int))
+        yield questions_in_batch_padded, answers_in_batch_padded
 
 
-
-
-
+## Splitting the questions and answers into training and validation sets
+training_validation_split_index = int(len(questions_cleaned_sorted) * 0.15)
+training_questions = questions_cleaned_sorted[training_validation_split_index:]
+training_answers = answers_cleaned_sorted[training_validation_split_index:]
+validation_questions = questions_cleaned_sorted[:training_validation_split_index]
+validation_answers = answers_cleaned_sorted[:training_validation_split_index]
 
 
 
