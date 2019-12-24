@@ -171,6 +171,7 @@ def model_inputs():
     keep_proba = tf.placeholder(tf.float32, name = "keep_proba")  # controls the drop-out rate
     
     return inputs, targets, learning_rate, keep_proba
+
     
 
 ## Preprocessing the targets
@@ -227,11 +228,11 @@ def decode_training_set(encoder_state, decoder_cell, decoder_embedded_input, seq
 
 ### Decoding the test/validation set
 def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix, sos_id, eos_id, maximum_length, 
-                    num_words, sequence_length, decoding_scope, output_function, keep_proba, batch_size):
+                    num_words, decoding_scope, output_function, keep_proba, batch_size):
     attention_states = tf.zeros([batch_size, 1, decoder_cell.output_size])
     attention_keys, attention_values, attention_score_function, attention_construct_function = tf.contrib.seq2seq.prepare_attention(attention_states = attention_states,
-                                                                                                                                    attention_option = "bahdanau",
-                                                                                                                                    num_units = decoder_cell.output_size)
+                                                                        attention_option = "bahdanau",
+                                                                        num_units = decoder_cell.output_size)
                                                                                                                                     
     test_decoder_function = tf.contrib.seq2seq.attention_decoder_fn_inference(output_function, 
                                                                               encoder_state[0],
@@ -292,8 +293,6 @@ def rnn_decoder(decoder_embedded_input, decoder_embeddings_matrix, encoder_state
     return training_predictions, test_predictions
 
 
-
-
 #### Putting together the Seq2Seq Model ########
 def seq2seq_model(inputs, targets, keep_proba, batch_size, sequence_length, answers_num_words, 
                   questions_num_words, encoder_embedding_size, decoder_embedding_size, rnn_size, 
@@ -315,7 +314,8 @@ def seq2seq_model(inputs, targets, keep_proba, batch_size, sequence_length, answ
 
 
 
-    decoder_embeddings_matrix = tf.Variable(tf.random_uniform([questions_num_words + 1, decoder_embedding_size], 0, 1))
+    decoder_embeddings_matrix = tf.Variable(tf.random_uniform([questions_num_words + 1, 
+                                                               decoder_embedding_size], 0, 1))
     
     decoder_embedded_input = tf.nn.embedding_lookup(decoder_embeddings_matrix,
                                                     preprocessed_targets)
@@ -334,28 +334,69 @@ def seq2seq_model(inputs, targets, keep_proba, batch_size, sequence_length, answ
 
 
 
+################### Training Seq2Seq Model ###############################################
+##########################################################################################
+    
+## Setting the hyperparameters
+epochs = 100
+batch_size = 64
+rnn_size = 512
+num_layers = 3
+encoding_embedding_size = 512
+decoding_embedding_size = 512
+learning_rate = 0.01
+learning_rate_decay = 0.9 # the percent of which the learning_rate is decayed over the duration of the iterations
+min_learning_rate = 0.0001
+keep_probability = 0.5 # selected based on the best practice value suggested from Geoffrey Hinton's paper for hidden units
 
 
 
+## Defining a session
+tf.reset_default_graph()
+session = tf.InteractiveSession()
+
+## Loading the model inputs
+inputs, targets, learning_rate, keep_proba = model_inputs()
+
+## Setting the sequence length
+sequence_length = tf.placeholder_with_default(25, None, name = "sequence_length")
+
+## Getting the shape of the inputs tensor
+input_shape = tf.shape(inputs)
+
+## Getting the training and test predictions
+training_predictions, test_predictions = seq2seq_model(tf.reverse(inputs, [-1]),
+                                                       targets,
+                                                       keep_proba,
+                                                       batch_size,
+                                                       sequence_length,
+                                                       len(answerwords2int),
+                                                       len(questionwords2int),
+                                                       encoding_embedding_size,
+                                                       decoding_embedding_size,
+                                                       rnn_size,
+                                                       num_layers,
+                                                       questionwords2int)
+                                                                   
+                                                                   
+
+
+## Setting up the Loss Error, the Optimizer and the Gradient Clipping
+with tf.name_scope("optimization"):
+    loss_error = tf.contrib.seq2seq.sequence_loss(training_predictions,
+                                                  targets,
+                                                  tf.ones([input_shape[0], sequence_length]))  # initialize weights to 1
+                                                  
+    optimizer = tf.train.AdamOptimizer(learning_rate)
+    gradients = optimizer.compute_gradients(loss_error)
+    clipped_gradients = [(tf.clip_by_value(gradient_tensor, -5., 5.), gradient_variable) for gradient_tensor, gradient_variable in gradients if gradient_tensor is not None]
+    optimizer_gradient_clipping = optimizer.apply_gradients(clipped_gradients)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## Padding the sequences with the <PAD> token
+## Question: ['who' 'are' 'you']
+## Answer: [<SOS> 'I' 'am' 'a' 'bot' '.' <EOS>]
 
 
 
