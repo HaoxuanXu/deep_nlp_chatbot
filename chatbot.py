@@ -167,20 +167,19 @@ def model_inputs():
     # The input and target are two-dimensional matrices with unique integers
     inputs = tf.placeholder(tf.int32, [None, None], name = "input")  
     targets = tf.placeholder(tf.int32, [None, None], name = "target")
-    learning_rate = tf.placeholder(tf.float32, name = "learning_rate")  # store the learning rate 
-    keep_proba = tf.placeholder(tf.float32, name = "keep_proba")  # controls the drop-out rate
+    lr = tf.placeholder(tf.float32, name = "learning_rate")  # store the learning rate 
+    keep_prob = tf.placeholder(tf.float32, name = "keep_prob")  # controls the drop-out rate
     
-    return inputs, targets, learning_rate, keep_proba
+    return inputs, targets, lr, keep_prob
 
     
 
 ## Preprocessing the targets
 ########## targets must be in batches 
-def preprocess_targets(targets, batch_size, word2int):
-    SOS_matrix = tf.fill([batch_size, 1], word2int["<SOS>"])
-    batched_answers = tf.strided_slice(targets, [0,0], [batch_size, -1], [1,1])         # strided_slice function extracts a subset of the tensor 
-    preprocessed_targets = tf.concat([SOS_matrix, batched_answers], axis = 1)
-    
+def preprocess_targets(targets, word2int, batch_size):
+    left_side = tf.fill([batch_size, 1], word2int['<SOS>'])
+    right_side = tf.strided_slice(targets, [0,0], [batch_size, -1], [1,1])
+    preprocessed_targets = tf.concat([left_side, right_side], 1)
     return preprocessed_targets
     
 
@@ -188,9 +187,9 @@ def preprocess_targets(targets, batch_size, word2int):
 
 
 ###### Creating the Encoder RNN Model ########
-def rnn_encoder(rnn_inputs, rnn_size, num_layers, keep_proba, sequence_length):
+def rnn_encoder(rnn_inputs, rnn_size, num_layers, keep_prob, sequence_length):
     lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
-    lstm_dropout = tf.contrib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_proba)
+    lstm_dropout = tf.contrib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_prob)
     encoder_cell = tf.contrib.rnn.MultiRNNCell([lstm_dropout] * num_layers)
     encoder_output, encoder_state = tf.nn.bidirectional_dynamic_rnn(cell_fw = encoder_cell, 
                                                        cell_bw = encoder_cell,
@@ -204,9 +203,9 @@ def rnn_encoder(rnn_inputs, rnn_size, num_layers, keep_proba, sequence_length):
 
 ### Decoding the training set
 def decode_training_set(encoder_state, decoder_cell, decoder_embedded_input, sequence_length, decoding_scope, 
-                        output_function, keep_proba, batch_size):
+                        output_function, keep_prob, batch_size):
     attention_states = tf.zeros([batch_size, 1, decoder_cell.output_size])
-    attention_keys, attention_values, attention_score_function, attention_construct_function = tf.contrib.seq2seq.prepare_attention(attention_states = attention_states,
+    attention_keys, attention_values, attention_score_function, attention_construct_function = tf.contrib.seq2seq.prepare_attention(attention_states,
                                                                                                                                     attention_option = "bahdanau",
                                                                                                                                     num_units = decoder_cell.output_size)
                                                                                                                                     
@@ -221,18 +220,19 @@ def decode_training_set(encoder_state, decoder_cell, decoder_embedded_input, seq
                                                                                                               decoder_embedded_input,
                                                                                                               sequence_length,
                                                                                                               scope = decoding_scope)
-    decoder_output_dropout = tf.nn.dropout(decoder_output, keep_proba)
+    decoder_output_dropout = tf.nn.dropout(decoder_output, keep_prob)
     return output_function(decoder_output_dropout)
 
 
 
 ### Decoding the test/validation set
 def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix, sos_id, eos_id, maximum_length, 
-                    num_words, decoding_scope, output_function, keep_proba, batch_size):
+                    num_words, decoding_scope, output_function, keep_prob, batch_size):
     attention_states = tf.zeros([batch_size, 1, decoder_cell.output_size])
-    attention_keys, attention_values, attention_score_function, attention_construct_function = tf.contrib.seq2seq.prepare_attention(attention_states = attention_states,
-                                                                        attention_option = "bahdanau",
-                                                                        num_units = decoder_cell.output_size)
+    attention_keys, attention_values, attention_score_function, attention_construct_function = tf.contrib.seq2seq.prepare_attention(attention_states,
+                                                                                                                                    attention_option = "bahdanau",
+                                                                                                                                    num_units = decoder_cell.output_size)
+                                                                       
                                                                                                                                     
     test_decoder_function = tf.contrib.seq2seq.attention_decoder_fn_inference(output_function, 
                                                                               encoder_state[0],
@@ -255,10 +255,10 @@ def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix, sos_
 
 ### Creating the RNN Decoder
 def rnn_decoder(decoder_embedded_input, decoder_embeddings_matrix, encoder_state, num_words, sequence_length, 
-                rnn_size, num_layers, word2int, keep_proba, batch_size):
+                rnn_size, num_layers, word2int, keep_prob, batch_size):
     with tf.variable_scope("decoding") as decoding_scope:
         lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
-        lstm_dropout = tf.contrib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_proba)
+        lstm_dropout = tf.contrib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_prob)
         decoder_cell = tf.contrib.rnn.MultiRNNCell([lstm_dropout] * num_layers)
         weights = tf.truncated_normal_initializer(stddev = 0.1)
         biases = tf.zeros_initializer()
@@ -275,7 +275,7 @@ def rnn_decoder(decoder_embedded_input, decoder_embeddings_matrix, encoder_state
                                                    sequence_length,
                                                    decoding_scope,
                                                    output_function,
-                                                   keep_proba,
+                                                   keep_prob,
                                                    batch_size)
         
         decoding_scope.reuse_variables()
@@ -288,13 +288,13 @@ def rnn_decoder(decoder_embedded_input, decoder_embeddings_matrix, encoder_state
                                            num_words,
                                            decoding_scope,
                                            output_function,
-                                           keep_proba,
+                                           keep_prob,
                                            batch_size)
     return training_predictions, test_predictions
 
 
 #### Putting together the Seq2Seq Model ########
-def seq2seq_model(inputs, targets, keep_proba, batch_size, sequence_length, answers_num_words, 
+def seq2seq_model(inputs, targets, keep_prob, batch_size, sequence_length, answers_num_words, 
                   questions_num_words, encoder_embedding_size, decoder_embedding_size, rnn_size, 
                   num_layers, questionwords2int):
     encoder_embedded_input = tf.contrib.layers.embed_sequence(inputs, 
@@ -305,12 +305,13 @@ def seq2seq_model(inputs, targets, keep_proba, batch_size, sequence_length, answ
     encoder_state = rnn_encoder(encoder_embedded_input,
                                 rnn_size,
                                 num_layers,
-                                keep_proba,
+                                keep_prob,
                                 sequence_length)
     
     preprocessed_targets = preprocess_targets(targets,
-                                              batch_size,
-                                              questionwords2int)
+                                              questionwords2int,
+                                              batch_size)
+                                             
 
 
 
@@ -327,7 +328,7 @@ def seq2seq_model(inputs, targets, keep_proba, batch_size, sequence_length, answ
                                                          rnn_size,
                                                          num_layers,
                                                          questionwords2int,
-                                                         keep_proba,
+                                                         keep_prob,
                                                          batch_size)
     
     return training_predictions, test_predictions
@@ -356,7 +357,7 @@ tf.reset_default_graph()
 session = tf.InteractiveSession()
 
 ## Loading the model inputs
-inputs, targets, learning_rate, keep_proba = model_inputs()
+inputs, targets, lr, keep_prob = model_inputs()
 
 ## Setting the sequence length
 sequence_length = tf.placeholder_with_default(25, None, name = "sequence_length")
@@ -367,7 +368,7 @@ input_shape = tf.shape(inputs)
 ## Getting the training and test predictions
 training_predictions, test_predictions = seq2seq_model(tf.reverse(inputs, [-1]),
                                                        targets,
-                                                       keep_proba,
+                                                       keep_prob,
                                                        batch_size,
                                                        sequence_length,
                                                        len(answerwords2int),
@@ -389,7 +390,7 @@ with tf.name_scope("optimization"):
                                                   
     optimizer = tf.train.AdamOptimizer(learning_rate)
     gradients = optimizer.compute_gradients(loss_error)
-    clipped_gradients = [(tf.clip_by_value(gradient_tensor, -5., 5.), gradient_variable) for gradient_tensor, gradient_variable in gradients if gradient_tensor is not None]
+    clipped_gradients = [(tf.clip_by_value(grad_tensor, -5., 5.), grad_variable) for grad_tensor, grad_variable in gradients if grad_tensor is not None]
     optimizer_gradient_clipping = optimizer.apply_gradients(clipped_gradients)
 
 
@@ -441,17 +442,18 @@ for epoch in range(1, epochs + 1):
     for batch_index, (questions_in_batch_padded, answers_in_batch_padded) in enumerate(split_into_batches(training_questions, training_answers, batch_size)):
         starting_time = time.time()
         # get the training loss error for this batch
-        _, batch_training_loss_error = session.run([optimizer_gradient_clipping, loss_error], 
-                                                   {inputs: questions_in_batch_padded, 
-                                                    targets: answers_in_batch_padded,
-                                                    learning_rate: learning_rate,
-                                                    sequence_length: answers_in_batch_padded.shape[1],
-                                                    keep_proba: keep_probability})
+        _, batch_training_loss_error = session.run([optimizer_gradient_clipping, loss_error], {inputs: questions_in_batch_padded,
+                                                                                               targets: answers_in_batch_padded,
+                                                                                               lr: learning_rate,
+                                                                                               sequence_length: answers_in_batch_padded.shape[1],
+                                                                                               keep_prob: keep_probability})
+                                                   
+                                                   
         total_training_loss_error += batch_training_loss_error
         ending_time = time.time()
         batch_time = ending_time - starting_time
         
-        if batch_index % batch_index_check_training_loss == 0 and batch_index > 0:
+        if batch_index % batch_index_check_training_loss == 0:
             print("Epoch: {:>3}/{}, Batch: {:>4}/{}, Training Error Loss: {:>6.3f}, Training Time on 100 Batches: {:d} seconds".format(epoch,
                                                                                                                                 epochs,
                                                                                                                                 batch_index,
@@ -468,12 +470,11 @@ for epoch in range(1, epochs + 1):
             for batch_index_validation, (questions_in_batch_padded, answers_in_batch_padded) in enumerate(split_into_batches(validation_questions, validation_answers, batch_size)):
 
         # get the training loss error for this batch
-                batch_validation_loss_error = session.run(loss_error, 
-                                                          {inputs: questions_in_batch_padded, 
-                                                           targets: answers_in_batch_padded,
-                                                           learning_rate: learning_rate,
-                                                           sequence_length: answers_in_batch_padded.shape[1],
-                                                           keep_proba: 1})
+                batch_validation_loss_error = session.run(loss_error, {inputs: questions_in_batch_padded,
+                                                                       targets: answers_in_batch_padded,
+                                                                       lr: learning_rate,
+                                                                       sequence_length: answers_in_batch_padded.shape[1],
+                                                                       keep_prob: 1})
                 total_validation_loss_error += batch_validation_loss_error
             
             ending_time = time.time()
@@ -482,7 +483,29 @@ for epoch in range(1, epochs + 1):
             average_validation_loss_error = total_validation_loss_error / (len(validation_questions)/batch_size)
             print("Validation Loss Error: {:>6.3f}, Batch Validation Time: {:d} seconds".format(average_validation_loss_error,
                                                                                          int(batch_time)))
+            
+            ## Applying decay to the learning rate
+            learning_rate *= learning_rate_decay
+            if learning_rate < min_learning_rate:
+                learning_rate = min_learning_rate
+            # take care of early stopping
+            list_validation_loss_error.append(average_validation_loss_error)
+            if average_validation_loss_error <= min(list_validation_loss_error):
+                print("I am getting better at this!!")
+                early_stopping_check = 0
+                saver = tf.train.Saver()
+                saver.save(session, checkpoint)
+            else:
+                print("Umm..I didn't learn much from this one...")
+                early_stopping_check += 1
+                if early_stopping_check == early_stopping_stop:
+                    break
+    if early_stopping_check == early_stopping_stop:
+        print("This is the best I can do for now.")
+        break
 
+print("Training Finished")
+                
 
 
 
