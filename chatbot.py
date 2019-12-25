@@ -163,6 +163,7 @@ for length in range(1, 25 + 1):
 ############## Building the Seq2Seq Model #####################################
 
 ## Creating placeholders for the inputs and the targets
+
 def model_inputs():
     # The input and target are two-dimensional matrices with unique integers
     inputs = tf.placeholder(tf.int32, [None, None], name = "input")  
@@ -176,6 +177,7 @@ def model_inputs():
 
 ## Preprocessing the targets
 ########## targets must be in batches 
+
 def preprocess_targets(targets, word2int, batch_size):
     left_side = tf.fill([batch_size, 1], word2int['<SOS>'])
     right_side = tf.strided_slice(targets, [0,0], [batch_size, -1], [1,1])
@@ -187,6 +189,7 @@ def preprocess_targets(targets, word2int, batch_size):
 
 
 ###### Creating the Encoder RNN Model ########
+
 def rnn_encoder(rnn_inputs, rnn_size, num_layers, keep_prob, sequence_length):
     lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
     lstm_dropout = tf.contrib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_prob)
@@ -202,6 +205,7 @@ def rnn_encoder(rnn_inputs, rnn_size, num_layers, keep_prob, sequence_length):
 
 
 ### Decoding the training set
+
 def decode_training_set(encoder_state, decoder_cell, decoder_embedded_input, sequence_length, decoding_scope, 
                         output_function, keep_prob, batch_size):
     attention_states = tf.zeros([batch_size, 1, decoder_cell.output_size])
@@ -226,6 +230,7 @@ def decode_training_set(encoder_state, decoder_cell, decoder_embedded_input, seq
 
 
 ### Decoding the test/validation set
+
 def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix, sos_id, eos_id, maximum_length, 
                     num_words, decoding_scope, output_function, keep_prob, batch_size):
     attention_states = tf.zeros([batch_size, 1, decoder_cell.output_size])
@@ -254,6 +259,7 @@ def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix, sos_
 
 
 ### Creating the RNN Decoder
+
 def rnn_decoder(decoder_embedded_input, decoder_embeddings_matrix, encoder_state, num_words, sequence_length, 
                 rnn_size, num_layers, word2int, keep_prob, batch_size):
     with tf.variable_scope("decoding") as decoding_scope:
@@ -294,6 +300,7 @@ def rnn_decoder(decoder_embedded_input, decoder_embeddings_matrix, encoder_state
 
 
 #### Putting together the Seq2Seq Model ########
+
 def seq2seq_model(inputs, targets, keep_prob, batch_size, sequence_length, answers_num_words, 
                   questions_num_words, encoder_embedding_size, decoder_embedding_size, rnn_size, 
                   num_layers, questionwords2int):
@@ -398,6 +405,7 @@ with tf.name_scope("optimization"):
 ## Padding the sequences with the <PAD> token
 ## Question: ['who' 'are' 'you', <PAD>, <PAD>, <PAD>, <PAD>]
 ## Answer: [<SOS> 'I' 'am' 'a' 'bot' '.' <EOS>, <PAD>, <PAD>]
+
 def apply_padding(batch_of_sequences, word2int):
     max_sequence_length = max([len(sequence) for sequence in batch_of_sequences])
     padded_sequences = [sequence + [word2int["<PAD>"]] * (max_sequence_length - len(sequence)) for sequence in batch_of_sequences]
@@ -405,6 +413,7 @@ def apply_padding(batch_of_sequences, word2int):
 
 
 ## Splitting the data into batches of questions and answers
+
 def split_into_batches(questions, answers, batch_size):
     for batch_index in range(0, len(questions)//batch_size):
         start_index = batch_index * batch_size
@@ -433,7 +442,7 @@ total_training_loss_error = 0
 list_validation_loss_error = []
 early_stopping_check = 0
 early_stopping_stop = 1000
-checkpoint = "chatbot_weights.ckpt"
+checkpoint = "C:/Users/John Xu/Desktop/deep_nlp_chatbot/chatbot_weights.ckpt"
 
 session.run(tf.global_variables_initializer())
 
